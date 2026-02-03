@@ -2,3 +2,4 @@ Commit on 2026-02-03: Clean up temporary files
 Commit on 2026-02-03: Refactor video processing logic
 Commit on 2026-02-03: Update documentation
 Commit on 2026-02-03: Fix indentation in app.py
+Commit on 2026-02-03: Optimize memory usage during rendering
