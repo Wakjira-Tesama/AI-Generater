@@ -6,3 +6,4 @@ Commit on 2026-02-03: Optimize memory usage during rendering
 Commit on 2026-02-03: Update dependencies
 Commit on 2026-02-03: Update documentation
 Commit on 2026-02-03: Update dependencies
+Commit on 2026-02-03: Clean up temporary files
