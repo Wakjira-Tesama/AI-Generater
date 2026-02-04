@@ -16,3 +16,4 @@ Commit on 2026-02-04: Fix bug in speed adjustment
 Commit on 2026-02-04: Fix typo in user instructions
 Commit on 2026-02-04: Optimize video generation speed
 Commit on 2026-02-04: Minor code cleanup
+Commit on 2026-02-04: Add error handling to video editor
