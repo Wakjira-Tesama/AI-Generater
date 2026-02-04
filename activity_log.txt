@@ -13,3 +13,4 @@ Commit on 2026-02-03: Update documentation
 Commit on 2026-02-03: Update dependencies
 Commit on 2026-02-03: Improve text overlay positioning
 Commit on 2026-02-04: Fix bug in speed adjustment
+Commit on 2026-02-04: Fix typo in user instructions
