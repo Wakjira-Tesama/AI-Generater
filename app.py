@@ -40,7 +40,9 @@ st.markdown("""
 # Sidebar
 with st.sidebar:
     st.title("Settings")
-    api_key = st.text_input("Enter Gemini API Key", type="password", value="AIzaSyBJsk6MLKAmWRgsoIRuLqgzYVWbnavba9A")
+    # Try to load from secrets, otherwise empty
+    default_key = st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else ""
+    api_key = st.text_input("Enter Gemini API Key", type="password", value=default_key)
     channel_handle = st.text_input("YouTube Channel Handle", value="@Wakjira-b8c")
     
     st.divider()
@@ -59,7 +61,7 @@ st.title("🌳 Oromo Heritage AI Generator")
 st.subheader("Create high-quality content about History, Culture, and Politics")
 
 # Tabs for different functions
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🎥 Video Script", "🔍 SEO & Metadata", "📚 Historical Research", "📈 Channel Strategy", "🎙️ Voice Generator", "🎬 Video Creator"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["🎥 Video Script", "🔍 SEO & Metadata", "📚 Historical Research", "📈 Channel Strategy", "🎙️ Voice Generator", "🎬 Video Creator", "🎞️ Video Editor"])
 
 with tab1:
     st.header("Generate Video Script")
@@ -191,10 +193,10 @@ with tab6:
         source_type = st.radio("Background Visuals", ["Generated Image", "YouTube Clip"])
         if source_type == "Generated Image":
             if image_files:
-                selected_image = st.selectbox("Select Image/Thumbnail", [os.path.basename(f) for f in image_files])
+                selected_images = st.multiselect("Select Images/Thumbnails (Sequential)", [os.path.basename(f) for f in image_files])
             else:
                 st.info("No images found. Generate some in the content tabs first.")
-                selected_image = None
+                selected_images = None
         else:
             yt_input_mode = st.radio("YouTube Input Mode", ["Search", "Direct URL"])
             
@@ -228,17 +230,23 @@ with tab6:
     video_out_name = st.text_input("Output Video Filename", value="oromo_final_video")
     
     if st.button("🎬 BUILD FINAL VIDEO"):
-        if selected_audio and ( (source_type == "Generated Image" and selected_image) or (source_type == "YouTube Clip" and 'selected_yt_url' in st.session_state) ):
+        if selected_audio and ( (source_type == "Generated Image" and selected_images) or (source_type == "YouTube Clip" and 'selected_yt_url' in st.session_state) ):
             
             with st.spinner("Assembling your Oromo Masterpiece..."):
                 try:
                     if source_type == "Generated Image":
                         if selected_audio == "ORIGINAL":
-                            st.error("Cannot use 'Original YouTube Audio' with a static image. Please select a Voiceover.")
+                            st.error("Cannot use 'Original YouTube Audio' with static images. Please select a Voiceover.")
                         else:
                             full_audio_path = next(f for f in audio_files if os.path.basename(f) == selected_audio)
-                            full_image_path = next(f for f in image_files if os.path.basename(f) == selected_image)
-                            video_path = video_engine.create_video(full_image_path, full_audio_path, video_out_name)
+                            
+                            # Get full paths for all selected images
+                            full_image_paths = []
+                            for img_name in selected_images:
+                                full_path = next(f for f in image_files if os.path.basename(f) == img_name)
+                                full_image_paths.append(full_path)
+                                
+                            video_path = video_engine.create_video(full_image_paths, full_audio_path, video_out_name)
                     else:
                         # Process YouTube Clip
                         with st.status("Fetching YouTube Clip...") as status:
@@ -266,6 +274,82 @@ with tab6:
                         st.code(str(e))
         else:
             st.error("Please ensure all sources are selected correctly.")
+
+with tab7:
+    st.header("🎞️ Video Editor (Beta)")
+    st.write("Post-process your videos: Trim, Speed Up/Down, Add Text.")
+    
+    # 1. Select Video
+    video_files = glob.glob("content/videos/*.mp4") + glob.glob("content/videos/edited/*.mp4")
+    # Sort by modification time to show newest first
+    try:
+        video_files.sort(key=os.path.getmtime, reverse=True)
+    except:
+        pass
+        
+    if video_files:
+        selected_edit_video = st.selectbox("Select Video to Edit", [os.path.basename(f) for f in video_files])
+        full_edit_path = next(f for f in video_files if os.path.basename(f) == selected_edit_video)
+        
+        st.video(full_edit_path)
+        
+        # 2. Controls
+        st.divider()
+        col_e1, col_e2 = st.columns(2)
+        
+        with col_e1:
+            st.subheader("✂️ Trim & Speed")
+            # We need duration. Let's try to guess or just let user input numbers.
+            # Ideally we read metadata but lightweight way:
+            st.info("Set start/end times. Leave End Time as 0 to keep until end.")
+            edit_start = st.number_input("Start Time (sec)", min_value=0.0, value=0.0, step=0.5)
+            edit_end = st.number_input("End Time (sec)", min_value=0.0, value=0.0, step=0.5)
+            edit_speed = st.slider("Playback Speed", 0.5, 2.0, 1.0, 0.1)
+            
+        with col_e2:
+            st.subheader("✍️ Add Text Overlay")
+            overlay_text = st.text_input("Text Content (Optional)")
+            if overlay_text:
+                overlay_pos = st.selectbox("Position", ["center", "top", "bottom", "west", "east", "north", "south"])
+                overlay_size = st.number_input("Font Size", 20, 200, 50)
+                overlay_color = st.color_picker("Text Color", "#FFFFFF")
+            
+        edit_out_name = st.text_input("Edited Filename", value=f"edited_{selected_edit_video.split('.')[0]}")
+        
+        if st.button("RENDER EDITED VIDEO"):
+            with st.spinner("Processing video... (This may take a moment)"):
+                try:
+                    text_conf = None
+                    if overlay_text:
+                        text_conf = {
+                            'text': overlay_text,
+                            'fontsize': overlay_size,
+                            'color': overlay_color,
+                            'position': overlay_pos
+                        }
+                    
+                    out_path = video_engine.process_video(
+                        full_edit_path,
+                        start_time=edit_start,
+                        end_time=edit_end if edit_end > 0 else None,
+                        text_overlay=text_conf,
+                        speed=edit_speed,
+                        output_filename=edit_out_name
+                    )
+                    
+                    if out_path and os.path.exists(out_path):
+                        st.success("Video Edited Successfully!")
+                        st.video(out_path)
+                        with open(out_path, "rb") as f:
+                            st.download_button(label="📥 Download Edited Video", data=f, file_name=f"{edit_out_name}.mp4", mime="video/mp4")
+                    else:
+                        st.error("Failed to save video.")
+                        
+                except Exception as e:
+                    st.error(f"Error editing video: {e}")
+                    
+    else:
+        st.info("No videos found in content/videos to edit. Create one in the Video Creator tab first!")
 
 st.divider()
 st.markdown(f"*Empowering {channel_handle} through technology. #OromoHistory #Bulbula*")
